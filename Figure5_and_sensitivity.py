@@ -380,7 +380,7 @@ dl_list = [30, 54] # index of duration
 iAB_list = [10, 20] # in xrange(len(A_B))] # Index of temperature deviations to study
 
 # S0 range to study
-maxprop = 20*S00 # 2
+maxprop = 20*S00 # = 2 because S00 = 0.1
 S0_list =  linspace(0, maxprop, 200) # good number of points = 200 
 
 fsize = 18#14#10#14
@@ -698,7 +698,7 @@ for tb in xrange(len(Tbar0_list)):
         #sub2.text(0, 0 - 42/12, "Non-density dependent growth ($S_0$)\nallocated to collapsing symbiont population\n(proportion of carrying capacity per year)", horizontalalignment = "center", fontsize = fsizeT)
         #sub2.text(0, 0 - 40/12, "Non-density dependent growth ($S_0$)\nallocated to collapsing symbiont population\n(proportion of carrying capacity per year)", horizontalalignment = "center", fontsize = fsizeT)
         #sub2.text(0, 0 - 19/12, "Non-density dependent growth ($S_0$)\nallocated to collapsing symbiont population\n(million cells cm$^{-2}$ month$^{-1}$)", horizontalalignment = "center", fontsize = fsizeT)
-        sub2.text(0, 0-8/12, r"$S_0$ ($\times 10^{6}$ cells cm$^{-2}$ month$^{-1}$)", horizontalalignment = "center", fontsize = fsizeT)
+        sub2.text(0, 0-8/12, r"$S_0$ ($\times 10^{6}$ cells cm$^{-2}$ year$^{-1}$)", horizontalalignment = "center", fontsize = fsizeT)
     sub1.set_title("%d"%Tbar0+u"\N{DEGREE SIGN}C", fontsize = fsizeT, fontproperties = font)
 
     if count == 1:
