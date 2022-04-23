@@ -1,5 +1,5 @@
 # Codes used to explore mechanisms mediating symbiont shuffling in coral
 
-Model6-case1: Hypothesis 1 
+Model6-H1: Hypothesis 1 
 
-Model6-case2: Hypothesis 2
+Model6-H2: Hypothesis 2
