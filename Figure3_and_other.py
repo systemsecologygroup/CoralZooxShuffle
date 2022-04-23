@@ -37,7 +37,7 @@ pylab.rcParams['xtick.major.pad']='8'
 
 # Temperature forcing function for first forcing, mid duration is included so that the first
 # phase of each forcing are identical but t1 is not needed for Forcing1 since temperature is not recovering (it's just I had t1 in other versions and I forgot to remove it) 
-def Forcing1(t, t0, t1, tk, tl, Tbar0, AorB):
+def Forcing1(t, t0, t1, tk, tl, Tbar0, AorB): # temperature is not recovering
     if t<t0:
         forc1 = Tbar0 
     elif t>=t0:
@@ -45,7 +45,7 @@ def Forcing1(t, t0, t1, tk, tl, Tbar0, AorB):
         forc1 = Tbar0 + AorB*((t - t0)**tl/(Half**tl + (t-t0)**tl))
     return forc1    
     
-def Forcing2(t, t0, t1, tk, tl, Tbar0, AorB):
+def Forcing2(t, t0, t1, tk, tl, Tbar0, AorB): # temperature is recovering
     midDuration = (t1-t0)/2
     if t<t0+midDuration:
         forc2 = Forcing1(t, t0, t1, tk, tl, Tbar0, AorB)
@@ -106,8 +106,8 @@ IndexInit_list = [IndexInit_26, IndexInit_27, IndexInit_28]
 
                     
 
-# Plot cases on the same plot for a particular Tbar0, duration and magnitude of stress for different time period
-"""
+# Figure 3 Plot cases on the same plot for a particular Tbar0, duration and magnitude of stress for different time period
+
 plt.figure(figsize = (12, 9))
 tb = 1 # Index of Tbar0 to plot
 ik = 0 # index of Tk to plot
@@ -384,11 +384,11 @@ ax2.text(1.5, 1.25, "$S_2$", color = "#d99058", fontsize = fsize)
 ax2.text(1.9, 1.25, "$S_3$", color = "#964b00", fontsize = fsize)
 
 plt.subplots_adjust(bottom = 0.06, right = 0.95, left = 0.1, top = 0.98, wspace = 0.15, hspace = 0.15)
-"""
+
+plt.savefig("Fig3.pdf", bbox_inches = 'tight')
 
 # For forcing 2 only, plot coral and symbiont contourplot density within axis magnitude and duration of stress 
 #for a particular Tbar0 and for the time period within which shuffling might happen and after within which recovery to pre-excrusion might happen                 
-
 
 # Creating contourplot data, save the data then comment this because it takes a while
 """
@@ -863,7 +863,7 @@ for k in xrange(3):
 plt.subplots_adjust(bottom = 0.1, right = 0.775, left = 0.2, top = 0.97, wspace = 0.15, hspace = 0.15)
 
 
-plt.savefig("TemporaryFig.pdf", bbox_inches = 'tight')
+plt.savefig("SuppFig.pdf", bbox_inches = 'tight')
 plt.show()
 
 
