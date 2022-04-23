@@ -740,7 +740,6 @@ plt.savefig("Figures/Fig5.pdf", bbox_inches = 'tight')
 Sensitivity bar plot with respect to the standard run which is the run under constant temperature over a 2 year period and the default parameters. 
 """
 
-"""
 # Time and initial conditions params
 step = 0.001
 tmax = 2
@@ -1017,7 +1016,7 @@ for tb in xrange(len(Tbar0_list)):
 plt.subplots_adjust(bottom = 0.05, right = 0.95, left = 0.1, top = 0.90, wspace = 0.05, hspace = 0.10)
 
 plt.savefig("Figures/SuppFig_barplot.pdf", bbox_inches = 'tight')
-"""
+
 
 
 
