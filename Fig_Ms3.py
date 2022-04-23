@@ -61,7 +61,7 @@ def Forcing2(t, t0, t1, tk, tl, Tbar0, AorB):
 F_list = [Forcing1, Forcing2]
 Forc = ["Forcing1", "Forcing2"]  
 
-cases = ["case1/", "case2/"]
+cases = ["H1/", "H2/"]
 
 # plot cases together for the all temperature
 Fig_labels = ["a", "b", "c", "d", "e", "f", "g", "h", "i"]

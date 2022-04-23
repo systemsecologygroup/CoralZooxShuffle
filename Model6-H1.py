@@ -68,7 +68,6 @@ S00 = 0.1
 #    return Grad 
  
 # Gradient of coral fitness, with bound to avoid negative investment, needed here
-
 def DELTA(u_i): # make delta high relative to u_i
     if abs(u_i)<=1e-5:
         res = 1e7
@@ -79,6 +78,8 @@ def DELTA(u_i): # make delta high relative to u_i
     else: # this is for abs(u_i)>=1e3 the complementary of all the above conditions
         res = 1e2
     return res
+
+
 def Gradient(Bound, coral, u_i, u, cost_gam, Gx1, beta, K_symb, kappa_i, alpha, delta,p_i, c_i):
     Grad = Gx1*beta*p_i*c_i*kappa_i*(1 - coral/K_C)*exp(-beta*u_i) - (Bound*(r*alpha*cost_gam*exp(r*u)) - delta*r*alpha*cost_gam*exp(r*u)*exp(-delta*u_i))
     return Grad    
