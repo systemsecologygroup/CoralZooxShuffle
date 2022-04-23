@@ -305,7 +305,443 @@ def SystemForcing2(t, y, Temperature, beta, gammaH, sigma1, sigma2, sigma3, S00,
     
     return dSystem
 
-# Sensitivity with respect to the standard run which is the run under constant temperature over a 2 year period and the default parameters. 
+"""
+# For Figure 5 Sensitivity of timing of symbiont shuffling with respect to S_0, Using temperature forcing 2
+"""
+# Use forcing 2 so that we can also say something about the recovery of initial symbiont population
+# the first phase (t<t0) of each forcing are identical but t1 is not needed for Forcing1 since temperature is not recovering, I just need to have this here for consistency in the next lines of codes 
+def Forcing1(t, t0, t1, tk, tl, Tbar0, AorB): # temperature is not recovering
+    if t<t0:
+        forc1 = Tbar0 
+    elif t>=t0:
+        Half = tk # half saturation 
+        forc1 = Tbar0 + AorB*((t - t0)**tl/(Half**tl + (t-t0)**tl))
+    return forc1    
+    
+def Forcing2(t, t0, t1, tk, tl, Tbar0, AorB): # temperature is recovering
+    midDuration = (t1-t0)/2
+    if t<t0+midDuration:
+        forc2 = Forcing1(t, t0, t1, tk, tl, Tbar0, AorB)
+    elif t>=t0 + midDuration and t<t1:
+        Half = tk
+        t0 = t0+midDuration # shift the origin of the sigmoid 
+        t = t1 + t0 - t # invert the sigmoid symetrically
+        forc2 = Tbar0+AorB*(((t - t0)**tl/(Half**tl + (t-t0)**tl)))
+    else:
+        forc2 = Tbar0
+    return forc2    
+        
+F_list = [Forcing1, Forcing2]
+Forc = ["Forcing1", "Forcing2"]  
+
+cases = ["case1/", "case2/"]
+
+#Simulation step and time in year after spine up
+step = 0.001
+tmax = 10
+
+# Initial conditions
+symb1_list = array([0.1, 0.8]) # proportion of symbiont1 to be studied
+symb2_list = array([0.1, 0.8]) # proportion of symbiont2 to be studied
+symb3_list = array([0.1, 0.8]) # proportion of symbiont3 to be studied
+
+# init symb biomass index low = 1 , high = 2 
+low = 0
+high = 1
+
+# Parameters for temperature forcing
+Tk = [(0.25/12)/14] # half saturation of sigmoid is 1/2 day after t0, the same for all forcing (see forcing functions)
+Tl = [2] # power of the sigmoid
+# list of deviations from tbar0
+ab_steps = 0.1
+A_B = arange(0, 4+ab_steps, ab_steps)
+
+F_list = [Forcing1, Forcing2] # forcing list
+Forc = ["Forcing1", "Forcing2"]  
+
+A_Bstr =["Height%d"%i for i in xrange(len(A_B))] # filenams for each elements in the list of deviations from Tbar0
+Tbar0_list  = [26, 27] # 28°C doesn't show any symbiont shuffling because there are not symbiont more adapted to temperature higher than 28°C
+
+t0 = 2 # maximum year of spine up
+dur_steps = 0.25/12  # steps of week i.e quater a month
+dur_list = arange(0.25/12, 4+dur_steps, dur_steps) # list of duration of stress, by steps of half a month, minimun duration is one week 
+dur_str=["Dur%d"%i for i in xrange(len(dur_list))]
+
+
+# symbiont more adapted to mean temperature Tbar0 is the more abundant       
+IndexInit_26 = (low, low, high)  # for Tbar0 = 26
+IndexInit_27 = (low, high, low)  # for Tbar0 = 27
+IndexInit_28 = (high, low, low) # for Tbar0 = 28
+IndexInit_list = [IndexInit_26, IndexInit_27, IndexInit_28] 
+
+
+# specific duration and magnitude of termal stress to study resp. corresponding to each temperature in Tbar0_list
+dl_list = [30, 54] # index of duration 
+iAB_list = [10, 20] # in xrange(len(A_B))] # Index of temperature deviations to study
+
+# S0 range to study
+maxprop = 20*S00 # 2
+S0_list =  linspace(0, maxprop, 200) # good number of points = 200 
+
+fsize = 18#14#10#14
+fsizeT = 20#16#12#16    
+
+"""
+fig2 = plt.figure(figsize = (12, 9))
+plt.subplots_adjust(bottom = 0.1, right = 0.70, left = 0.15, top = 0.95, wspace = 0.1, hspace = 0.165)            
+"""
+# fig labels
+Lab1 = ["a", "b"]
+Lab2 = ["c", "d"]
+
+#linewidths
+lw_case1 = 1.5
+lw_case2 = 6
+
+### Saving data. For just plotting, put this block as comment after saving the data, because it takes time to run 
+### Forcing 2 is used
+"""
+ShiftList1 = []
+ShiftList2 = []
+RecovList1 = []
+RecovList2 = []
+
+for tb in xrange(len(Tbar0_list)): 
+    DL = dl_list[tb]  
+    iAB = iAB_list[tb]                              
+    t1 = t0 + dur_list[DL]
+    IndexInit = IndexInit_list[tb]  
+    Tbar0 = Tbar0_list[tb]                                                                            
+    print IndexInit
+    i1 = IndexInit[0]
+    i2 = IndexInit[1]
+    i3 = IndexInit[2]
+    symb1 = symb1_list[i1] 
+    symb2 = symb2_list[i2]
+    symb3 = symb3_list[i3]
+    Initial = array([0.75*K_C, 0.0000005, 0.0000005, 0.0000005, symb1*Ksmax*0.75*K_C, symb2*Ksmax*0.75*K_C, symb3*0.75*Ksmax*K_C])
+    Time = arange(0, t0+tmax+step, step)
+    
+    ShiftDomTiming1 = zeros(len(S0_list)) 
+    ShiftDomTiming2 = zeros(len(S0_list))
+    RecovTiming1 = zeros(len(S0_list))
+    RecovTiming2 = zeros(len(S0_list))
+    for iS0 in xrange(len(S0_list)):
+        S00_i = S0_list[iS0]
+        tk = Tk[0]
+        tl = Tl[0]
+        print Tbar0, iS0, len(S0_list)
+        Temperature = Forcing2(0, t0, t1, tk, tl, Tbar0, A_B[iAB])
+        for case in xrange(2):
+            if case == 0:
+                ode15s = ode(SystemForcing1)
+                ode15s.set_f_params(Temperature, beta, gammaH, sigma1, sigma2, sigma3, S00_i, N, cmax)
+            else:
+                ode15s = ode(SystemForcing2)
+                ode15s.set_f_params(Temperature, beta, gammaH, sigma1, sigma2, sigma3, S00_i, N, cmax, rho)
+
+            # Introducing temperature dependence, environmental temperature forcing
+            ode15s.set_integrator('vode', method='bdf', order=15, nsteps=3000)
+            ode15s.set_initial_value(Initial, 0)
+            Dynamics = zeros((len(Time), len(Initial)))
+            Dynamics[0, 0] = ode15s.y[0]
+            Dynamics[0, 1] = ode15s.y[1]
+            Dynamics[0, 2] = ode15s.y[2]
+            Dynamics[0, 3] = ode15s.y[3]
+            Dynamics[0, 4] = ode15s.y[4]
+            Dynamics[0, 5] = ode15s.y[5]
+            Dynamics[0, 6] = ode15s.y[6]
+        
+            k=1
+            while ode15s.successful() and k<len(Time):#ode15s.t <= max(Time)-step+1:
+                #print len(Time), k, max(Time) - step
+                ode15s.integrate(ode15s.t+step)
+                Dynamics[k, 0] = ode15s.y[0]
+                Dynamics[k, 1] = ode15s.y[1]
+                Dynamics[k, 2] = ode15s.y[2]
+                Dynamics[k, 3] = ode15s.y[3]
+                Dynamics[k, 4] = ode15s.y[4]
+                Dynamics[k, 5] = ode15s.y[5]
+                Dynamics[k, 6] = ode15s.y[6]
+                # Updating environmental temperature forcing
+                Temperature = Forcing2(ode15s.t+step, t0, t1, tk, tl, Tbar0, A_B[iAB])
+                if case == 0:
+                    ode15s.set_f_params(Temperature, beta, gammaH, sigma1, sigma2, sigma3, S00_i, N, cmax)
+                if case == 1:
+                    ode15s.set_f_params(Temperature, beta, gammaH, sigma1, sigma2, sigma3, S00_i, N, cmax, rho)
+                k+=1
+            
+            #traj 
+            
+            if tb == 0 and iS0 <= 10:
+                if case == 0:
+                    sub0 = fig2.add_subplot(221)
+                    sub0.set_title("%d"%Tbar0+u"\N{DEGREE SIGN}C", fontsize = fsizeT, fontproperties = font)
+                    sub0.plot(Time, (Dynamics[:,6]/Dynamics[:,0])/1e6, linewidth = lw_case1, color = "#fbceb1")
+                    sub0.plot(Time, (Dynamics[:,5]/Dynamics[:,0])/1e6,linewidth = lw_case1, color = "#d99058")
+                    sub0.plot(Time, (Dynamics[:,4]/Dynamics[:,0])/1e6,linewidth = lw_case1, color = "#964b00")
+                if case == 1:
+                    sub0 = fig2. add_subplot(223)
+                    sub0.plot(Time, (Dynamics[:,6]/Dynamics[:,0])/1e6, linewidth = lw_case2, color = "#fbceb1")
+                    sub0.plot(Time, (Dynamics[:,5]/Dynamics[:,0])/1e6,linewidth = lw_case2, color = "#d99058")
+                    sub0.plot(Time, (Dynamics[:,4]/Dynamics[:,0])/1e6,linewidth = lw_case2, color = "#964b00")
+            if tb == 1 and iS0 <= 10:
+                if case == 0:
+                    sub0 = fig2.add_subplot(222)
+                    sub0.set_title("%d"%Tbar0+u"\N{DEGREE SIGN}C", fontsize = fsizeT, fontproperties = font)
+                    sub0.plot(Time, (Dynamics[:,6]/Dynamics[:,0])/1e6, linewidth = lw_case1, color = "#fbceb1")
+                    sub0.plot(Time, (Dynamics[:,5]/Dynamics[:,0])/1e6,linewidth = lw_case1, color = "#d99058")
+                    sub0.plot(Time, (Dynamics[:,4]/Dynamics[:,0])/1e6,linewidth = lw_case1, color = "#964b00")
+                if case == 1:
+                    sub0 = fig2. add_subplot(224)
+                    sub0.plot(Time, (Dynamics[:,6]/Dynamics[:,0])/1e6, linewidth = lw_case2, color = "#fbceb1")
+                    sub0.plot(Time, (Dynamics[:,5]/Dynamics[:,0])/1e6,linewidth = lw_case2, color = "#d99058")
+                    sub0.plot(Time, (Dynamics[:,4]/Dynamics[:,0])/1e6,linewidth = lw_case2, color = "#964b00")
+            
+            # Find the time when the density of more adapted symbiont becomes lower than the density of the other symbiont
+            # knowing that this occurs for this particula temperature forcing and parameters
+            if Tbar0 == 26:
+                # testing for occurence of shuffling, it happens if one of the test is true, therefore a +
+                Test = (Dynamics[:, 6] < Dynamics[:, 5])+(Dynamics[:, 6] < Dynamics[:, 4])
+            elif Tbar0 == 27:
+                Test = (Dynamics[:, 5] < Dynamics[:, 4])+(Dynamics[:, 5] < Dynamics[:, 6])
+                
+            if case == 0:
+                if len(Time[Test]) !=0:
+                    ShiftDomTiming1[iS0] = Time[Test][0] # take the first time the test is true
+                    # testing for recovery after temperature returen to baseline, it happens only if all tests are true, therefore *
+                    if Tbar0 == 26:
+                        Test1 = (Dynamics[Time>=t1, 6] > Dynamics[Time>=t1, 5])*(Dynamics[Time>=t1, 6] > Dynamics[Time>=t1, 4])
+                        if sum(Test1)!=0:
+                            RecovTiming1[iS0] = Time[Time>=t1][Test1][0]
+                        else:
+                            RecovTiming1[iS0] = 1e6 # some impossible number
+                    elif Tbar0 == 27:
+                        Test1 = (Dynamics[Time>=t1, 5] > Dynamics[Time>=t1, 4])*(Dynamics[Time>=t1, 5] > Dynamics[Time>=t1, 6])
+                        if sum(Test1)!=0:
+                            RecovTiming1[iS0] = Time[Time>=t1][Test1][0]
+                        else:
+                            RecovTiming1[iS0] = 1e6 # some impossible number
+                else:
+                    ShiftDomTiming1[iS0] = 1e6 # some impossible number 
+                    RecovTiming1[iS0] = 1e6
+            else:
+                if len(Time[Test]) !=0:
+                    ShiftDomTiming2[iS0] = Time[Test][0] # take the first time the test is true    
+                    # Testing for recovery , it happens only if all tests are true, therefore *
+                    if Tbar0 == 26:
+                        Test1 = (Dynamics[Time>=t1, 6] > Dynamics[Time>=t1, 5])*(Dynamics[Time>=t1, 6] > Dynamics[Time>=t1, 4])
+                        if sum(Test1)!=0:
+                            RecovTiming2[iS0] = Time[Time>=t1][Test1][0]
+                        else:
+                            RecovTiming2[iS0] = 1e6 # some impossible number
+                    elif Tbar0 == 27:
+                        Test1 = (Dynamics[Time>=t1, 5] > Dynamics[Time>=t1, 4])*(Dynamics[Time>=t1, 5] > Dynamics[Time>=t1, 6])
+                        if sum(Test1)!=0:
+                            RecovTiming2[iS0] = Time[Time>=t1][Test1][0]
+                        else:
+                            RecovTiming2[iS0] = 1e6 # some impossible number
+                else:
+                    ShiftDomTiming2[iS0] = 1e6  # some impossible number 
+                    RecovTiming2[iS0] = 1e6                        
+    ShiftList1.append(ShiftDomTiming1)
+    ShiftList2.append(ShiftDomTiming2)
+    RecovList1.append(RecovTiming1)
+    RecovList2.append(RecovTiming2)
+
+# saving files
+fileShift1 = open("TimingData/Shift_H1.dat", "wr")
+fileShift2 = open("TimingData/Shift_H2.dat", "wr")
+fileRecov1 = open("TimingData/Recov_H1.dat", "wr")
+fileRecov2 = open("TimingData/Recov_H2.dat", "wr")
+
+array(ShiftList1).dump(fileShift1)
+fileShift1.flush()
+array(ShiftList2).dump(fileShift2)
+fileShift2.flush()
+array(RecovList1).dump(fileRecov1)
+fileRecov1.flush()
+array(RecovList2).dump(fileRecov2)
+fileRecov2.flush()
+"""
+
+""" Figure 5 """
+# Plotting saved file (# Sensitivity of timing of symbiont shuffling with respect to S_0, Using temperature forcing 2 displayed in the 1D figures)
+
+fig = plt.figure(figsize = (17, 9))
+#plt.subplots_adjust(bottom = 0.1, right = 0.85, left = 0.10, top = 0.95, wspace = 0.1, hspace = 0.1) # small screen  for poportion of carrying capacity on the x-axis
+#plt.subplots_adjust(bottom = 0.1, right = 0.85, left = 0.10, top = 0.95, wspace = 0.15, hspace = 0.1) # small screen  for million cell/cm2 per month
+
+#plt.subplots_adjust(bottom = 0.25, right = 0.70, left = 0.10, top = 0.95, wspace = 0.1, hspace = 0.1) # large screen           
+
+h1col = "blue"
+h2col = "orange"
+
+fileShift1 = open("TimingData-tmax10yrs/Shift_H1.dat", "r")
+fileShift2 = open("TimingData-tmax10yrs/Shift_H2.dat", "r")
+fileRecov1 = open("TimingData-tmax10yrs/Recov_H1.dat", "r")
+fileRecov2 = open("TimingData-tmax10yrs/Recov_H2.dat", "r")
+
+ShiftDomTimingList1 = load(fileShift1, allow_pickle = True)
+fileShift1.close()
+ShiftDomTimingList2 = load(fileShift2, allow_pickle = True)
+fileShift2.close()
+RecovTimingList1 = load(fileRecov1, allow_pickle = True)
+fileRecov1.close()
+RecovTimingList2 = load(fileRecov2, allow_pickle = True)
+fileRecov2.close()
+count = 1
+Marksiz = 50
+
+maxprop = 1 # could go up to 2
+maxMonth1 = 15 # maximum month to observe shuffling
+maxMonth2 = 40 # maximum month to observe recovery
+for tb in xrange(len(Tbar0_list)): 
+    DL = dl_list[tb]  
+    iAB = iAB_list[tb]                              
+    t1 = t0 + dur_list[DL]
+    IndexInit = IndexInit_list[tb]  
+    Tbar0 = Tbar0_list[tb]                                                                            
+    print IndexInit
+    i1 = IndexInit[0]
+    i2 = IndexInit[1]
+    i3 = IndexInit[2]
+    symb1 = symb1_list[i1] 
+    symb2 = symb2_list[i2]
+    symb3 = symb3_list[i3]
+    Initial = array([0.75*K_C, 0.0000005, 0.0000005, 0.0000005, symb1*Ksmax*0.75*K_C, symb2*Ksmax*0.75*K_C, symb3*0.75*Ksmax*K_C])
+    Time = arange(0, t0+tmax+step, step)
+    
+    ShiftDomTiming1 = ShiftDomTimingList1[tb]
+    ShiftDomTiming2 = ShiftDomTimingList2[tb]
+    RecovTiming1 = RecovTimingList1[tb]
+    RecovTiming2 = RecovTimingList2[tb]
+                  
+    sub1 = fig.add_subplot(2, 2, count)
+    sub2 = fig.add_subplot(2, 2, count+2)
+    
+    notIgnore1a = ShiftDomTiming1 != 1e6
+    notIgnore2a = ShiftDomTiming2 != 1e6   
+
+    notIgnore1b = (RecovTiming1!=1e6)
+    notIgnore2b = (RecovTiming2!=1e6) 
+    
+    
+    # plot scatter points open filled circle for H1, circle for H2
+    sub1.scatter(S0_list[notIgnore1a], ShiftDomTiming1[notIgnore1a]-t0, s = Marksiz, color = h1col, label = "H1")
+    sub1.scatter(S0_list[notIgnore2a], ShiftDomTiming2[notIgnore2a]-t0, s = Marksiz, color= h2col, label = "H2")
+    if tb == 0:
+        sub1.legend(fontsize = fsize)
+    
+    sub2.scatter(S0_list[notIgnore1b], RecovTiming1[notIgnore1b]-t1, s = Marksiz, color = h1col)
+    sub2.scatter(S0_list[notIgnore2b], RecovTiming2[notIgnore2b]-t1, s = Marksiz, color= h2col)
+
+        
+    sub1.tick_params(labelbottom = False, labeltop = False, bottom = True, top = True, axis = "x", direction = "in", pad = 10, labelsize = fsize)
+    sub2.tick_params(labelbottom = True, labeltop = False, bottom = True, top = True, axis = "x", direction = "in", pad = 10, labelsize = fsize)
+    
+    if count == 1:
+        sub1.tick_params(labelleft = True, labelright = False, left = True, right = True, bottom = True, top = True, axis = "y", direction = "in", pad = 5, labelsize = fsize)
+        sub2.tick_params(labelleft = True, labelright = False, left = True, right = True, bottom = True, top = True, axis = "y", direction = "in", pad = 5, labelsize = fsize)
+
+    if count == 2:
+        sub1.tick_params(labelleft = False, labelright = False, left = True, right = True, bottom = True, top = True, axis = "y", direction = "in", pad = 5, labelsize = fsize)
+        sub2.tick_params(labelleft = False, labelright = False, left = True, right = True, bottom = True, top = True, axis = "y", direction = "in", pad = 5, labelsize = fsize)
+ 
+    #sub1.set_xticks(arange(min(S0_list), max(S0_list)+0.1, 0.1))
+    #sub1.set_xticklabels(["%.1f"%s0 for s0 in arange(min(S0_list), max(S0_list)+0.1, 0.1)]) 
+    sub1.set_xticks(arange(0, maxprop+0.1, 0.1)[::2])
+    #sub1.set_xticklabels(["%.1f"%(s0*Ksmax/(1e6) for s0 in arange(0, maxprop+0.1, 0.1)]) 
+    sub2.set_xticks(arange(0, maxprop+0.1, 0.1)[::2])
+    sub2.set_xticklabels(["%.1f"%(s0*Ksmax/(1e6)) for s0 in arange(0, maxprop+0.1, 0.1)]) # converting s0 to million cells/cm2 per year to for consitency with manuscript text
+    
+    maxTa = max(max(ShiftDomTiming1[notIgnore1a])-t0, max(ShiftDomTiming2[notIgnore2a])-t0)
+    minTa = min(min(ShiftDomTiming1[notIgnore1a])-t0, min(ShiftDomTiming2[notIgnore2a])-t0)
+    
+    if sum(notIgnore1b)!=0 and sum(notIgnore2b)!=0:
+        maxTb = max(max(RecovTiming1[notIgnore1b])-t1, max(RecovTiming2[notIgnore2b])-t1)
+        minTb = min(min(RecovTiming1[notIgnore1b])-t1, min(RecovTiming2[notIgnore2b])-t1)
+    elif sum(notIgnore1b)!=0:
+        maxTb = max(RecovTiming1[notIgnore1b])-t1
+        mintTb =min(RecovTiming1[notIgnore1b])-t1
+    elif sum(notIgnore2b)!=0:
+        maxTb = max(RecovTiming2[notIgnore2b])-t1
+        mintTb =min(RecovTiming2[notIgnore2b])-t1
+        
+    sub1.set_ylim((0, maxMonth1/12))#((minTa-0.1, maxTa+0.1))
+    sub1.set_xlim((0, maxprop))#((min(S0_list), max(S0_list)))
+    
+    sub2.set_ylim((0, maxMonth2/12))#((minTb-0.1, maxTb+0.1))
+    sub2.set_xlim((0, maxprop))#((min(S0_list), max(S0_list)))
+    
+    #sub1.plot(S00*ones(5), linspace(minTa-0.1, maxTa+0.1, 5), color = "green", linewidth = 2) # indicating the value used in main results
+    #sub2.plot(S00*ones(5), linspace(minTb-0.1, maxTb+0.1, 5), color = "green", linewidth = 2) # indicating the value used in main results
+    
+    sub1.plot(S00*ones(5), linspace(0, maxMonth1/12, 5),"--", color = "black", linewidth = 2) # indicating the value used in main results
+    sub2.plot(S00*ones(5), linspace(0, maxMonth2/12, 5),"--", color = "black", linewidth = 2, label = "$S_0$ for Fig 3-4") # indicating the value used in main results
+    
+    if tb == 0:
+        sub2.legend(fontsize = fsize - 2)
+    
+    sub1.set_yticks(arange(0, maxMonth1/12 + 1/12, 1/12))#(linspace(minTa-0.1, maxTa+0.1, 10))
+    sub1.set_yticklabels(["%d"%temp for temp in arange(0, maxMonth1 + 1, 1)])
+    
+    sub2.set_yticks(arange(0, maxMonth2/12 + 1/12, 5/12))#(linspace(minTb-0.1, maxTb+0.1, 10))
+    sub2.set_yticklabels(["%d"%temp for temp in arange(0, maxMonth2 + 1, 5)])
+    if count == 1:
+        #sub1.set_ylabel("Shift of symbiont dominance\nfrom the start of thermal shift\n(months) ", fontsize = fsizeT, labelpad = 8) #labelpad= 9)
+        sub1.set_ylabel("Symbiont shuffling from\nonset of temperature shift\n(month) ", fontsize = fsizeT, labelpad = 8)
+        #sub2.set_ylabel("Recovery of initial symbiont\nfrom the end of thermal shift\n(months) ", fontsize = fsizeT, labelpad = 1) #labelpad= 9)
+        sub2.set_ylabel("Symbiont recovery from\nend of temperature shift\n(month) ", fontsize = fsizeT, labelpad = 1) #labe
+    if count == 2:
+        #sub2.text(S0_list[0]-0.5, minTb - 1.2, "Rate of symbiont sustainance $S_0$ (year$^{-1}$)", fontsize = fsizeT)
+        #sub2.text(0, 0 - 42/12, "Non-density dependent growth ($S_0$)\nallocated to collapsing symbiont population\n(proportion of carrying capacity per year)", horizontalalignment = "center", fontsize = fsizeT)
+        #sub2.text(0, 0 - 40/12, "Non-density dependent growth ($S_0$)\nallocated to collapsing symbiont population\n(proportion of carrying capacity per year)", horizontalalignment = "center", fontsize = fsizeT)
+        #sub2.text(0, 0 - 19/12, "Non-density dependent growth ($S_0$)\nallocated to collapsing symbiont population\n(million cells cm$^{-2}$ month$^{-1}$)", horizontalalignment = "center", fontsize = fsizeT)
+        sub2.text(0, 0-8/12, r"$S_0$ ($\times 10^{6}$ cells cm$^{-2}$ month$^{-1}$)", horizontalalignment = "center", fontsize = fsizeT)
+    sub1.set_title("%d"%Tbar0+u"\N{DEGREE SIGN}C", fontsize = fsizeT, fontproperties = font)
+
+    if count == 1:
+        #sub1.text(S0_list[0]-0.20, maxTa+0.1, Lab1[tb], fontproperties = font, fontsize = fsize)
+        #sub2.text(S0_list[0]-0.20, maxTb+0.1, Lab2[tb], fontproperties = font, fontsize = fsize)
+        sub1.text(S0_list[0]-0.155, maxMonth1/12, Lab1[tb], fontproperties = font, fontsize = fsize)
+        sub2.text(S0_list[0]-0.155, maxMonth2/12, Lab2[tb], fontproperties = font, fontsize = fsize)
+    else:
+        #sub1.text(S0_list[0]-0.05, maxTa+0.1, Lab1[tb], fontproperties = font, fontsize = fsize)
+        #sub2.text(S0_list[0]-0.05, maxTb+0.1, Lab2[tb], fontproperties = font, fontsize = fsize)
+        sub1.text(S0_list[0]-0.05, maxMonth1/12, Lab1[tb], fontproperties = font, fontsize = fsize)
+        sub2.text(S0_list[0]-0.05, maxMonth2/12, Lab2[tb], fontproperties = font, fontsize = fsize)
+    count += 1 
+    
+    """
+    if tb == 0:
+        sub1.annotate(s='', xy=(1,0.65), xytext=(0.25,0.65), arrowprops=dict(arrowstyle='<->'), color = h1col)
+        sub2.annotate(s='', xy=(1,1.4), xytext=(0.225,1.4), arrowprops=dict(arrowstyle='<->'), color = h1col)
+        
+        sub1.annotate(s='', xy=(1,0.7), xytext=(0.07,0.7), arrowprops=dict(arrowstyle='<->', color = h2col))
+        sub2.annotate(s='', xy=(0.06,1.4), xytext=(0.15,1.4), arrowprops=dict(arrowstyle='<->', color = h2col))
+    
+    else:
+        sub1.annotate(s='', xy=(1,0.2), xytext=(0.2,0.2), arrowprops=dict(arrowstyle='<->'), color = h1col)
+        sub2.annotate(s='', xy=(0.15,1.7), xytext=(0.25,1.7), arrowprops=dict(arrowstyle='<->'), color = h1col)
+        sub2.annotate(s='', xy=(1,1.7), xytext=(0.725,1.7), arrowprops=dict(arrowstyle='<->'), color = h1col)
+
+        sub1.annotate(s='', xy=(1,0.1), xytext=(0.07,0.1), arrowprops=dict(arrowstyle='<->', color = h2col))
+    """
+#Separately
+#plt.subplots_adjust(bottom = 0.5, right = 0.80, left = 0.10, top = 0.90, wspace = 0.1, hspace = 0.15) # big screen            
+#plt.subplots_adjust(bottom = 0.5, right = 0.60, left = 0.10, top = 0.90, wspace = 0.1, hspace = 0.15) # small screen           
+
+#Together
+plt.subplots_adjust(bottom = 0.1, right = 0.60, left = 0.10, top = 0.95, wspace = 0.1, hspace = 0.15)            
+
+
+plt.savefig("Figures/Fig5.pdf", bbox_inches = 'tight')
+
+       
+"""
+Sensitivity bar plot with respect to the standard run which is the run under constant temperature over a 2 year period and the default parameters. 
+"""
 
 """
 # Time and initial conditions params
@@ -583,449 +1019,8 @@ for tb in xrange(len(Tbar0_list)):
     count += 2 
 plt.subplots_adjust(bottom = 0.05, right = 0.95, left = 0.1, top = 0.90, wspace = 0.05, hspace = 0.10)
 
+plt.savefig("Figures/SuppFig_barplot.pdf", bbox_inches = 'tight')
 """
-
-# Sensitivity of timing of symbiont shuffling with respect to S_0, Using temperature forcing 2
-# Use forcing 2 so that we can also say something about the recovery of initial symbiont population
-# the first phase (t<t0) of each forcing are identical but t1 is not needed for Forcing1 since temperature is not recovering, I just need to have this here for consistency in the next lines of codes 
-def Forcing1(t, t0, t1, tk, tl, Tbar0, AorB): # temperature is not recovering
-    if t<t0:
-        forc1 = Tbar0 
-    elif t>=t0:
-        Half = tk # half saturation 
-        forc1 = Tbar0 + AorB*((t - t0)**tl/(Half**tl + (t-t0)**tl))
-    return forc1    
-    
-def Forcing2(t, t0, t1, tk, tl, Tbar0, AorB): # temperature is recovering
-    midDuration = (t1-t0)/2
-    if t<t0+midDuration:
-        forc2 = Forcing1(t, t0, t1, tk, tl, Tbar0, AorB)
-    elif t>=t0 + midDuration and t<t1:
-        Half = tk
-        t0 = t0+midDuration # shift the origin of the sigmoid 
-        t = t1 + t0 - t # invert the sigmoid symetrically
-        forc2 = Tbar0+AorB*(((t - t0)**tl/(Half**tl + (t-t0)**tl)))
-    else:
-        forc2 = Tbar0
-    return forc2    
-        
-F_list = [Forcing1, Forcing2]
-Forc = ["Forcing1", "Forcing2"]  
-
-cases = ["case1/", "case2/"]
-
-#Simulation step and time in year after spine up
-step = 0.001
-tmax = 10
-
-# Initial conditions
-symb1_list = array([0.1, 0.8]) # proportion of symbiont1 to be studied
-symb2_list = array([0.1, 0.8]) # proportion of symbiont2 to be studied
-symb3_list = array([0.1, 0.8]) # proportion of symbiont3 to be studied
-
-# init symb biomass index low = 1 , high = 2 
-low = 0
-high = 1
-
-# Parameters for temperature forcing
-Tk = [(0.25/12)/14] # half saturation of sigmoid is 1/2 day after t0, the same for all forcing (see forcing functions)
-Tl = [2] # power of the sigmoid
-# list of deviations from tbar0
-ab_steps = 0.1
-A_B = arange(0, 4+ab_steps, ab_steps)
-
-F_list = [Forcing1, Forcing2] # forcing list
-Forc = ["Forcing1", "Forcing2"]  
-
-A_Bstr =["Height%d"%i for i in xrange(len(A_B))] # filenams for each elements in the list of deviations from Tbar0
-Tbar0_list  = [26, 27] # 28°C doesn't show any symbiont shuffling because there are not symbiont more adapted to temperature higher than 28°C
-
-t0 = 2 # maximum year of spine up
-dur_steps = 0.25/12  # steps of week i.e quater a month
-dur_list = arange(0.25/12, 4+dur_steps, dur_steps) # list of duration of stress, by steps of half a month, minimun duration is one week 
-dur_str=["Dur%d"%i for i in xrange(len(dur_list))]
-
-
-# symbiont more adapted to mean temperature Tbar0 is the more abundant       
-IndexInit_26 = (low, low, high)  # for Tbar0 = 26
-IndexInit_27 = (low, high, low)  # for Tbar0 = 27
-IndexInit_28 = (high, low, low) # for Tbar0 = 28
-IndexInit_list = [IndexInit_26, IndexInit_27, IndexInit_28] 
-
-
-# specific duration and magnitude of termal stress to study resp. corresponding to each temperature in Tbar0_list
-dl_list = [30, 54] # index of duration 
-iAB_list = [10, 20] # in xrange(len(A_B))] # Index of temperature deviations to study
-
-# S0 range to study
-maxprop = 20*S00 # 2
-S0_list =  linspace(0, maxprop, 200) # good number of points = 200 
-
-fsize = 18#14#10#14
-fsizeT = 20#16#12#16    
-
-"""
-fig2 = plt.figure(figsize = (12, 9))
-plt.subplots_adjust(bottom = 0.1, right = 0.70, left = 0.15, top = 0.95, wspace = 0.1, hspace = 0.165)            
-"""
-# fig labels
-Lab1 = ["a", "b"]
-Lab2 = ["c", "d"]
-
-#linewidths
-lw_case1 = 1.5
-lw_case2 = 6
-
-### Saving data. For just plotting, put this block as comment after saving the data, because it takes time to run 
-### Forcing 2 is used
-"""
-ShiftList1 = []
-ShiftList2 = []
-RecovList1 = []
-RecovList2 = []
-
-for tb in xrange(len(Tbar0_list)): 
-    DL = dl_list[tb]  
-    iAB = iAB_list[tb]                              
-    t1 = t0 + dur_list[DL]
-    IndexInit = IndexInit_list[tb]  
-    Tbar0 = Tbar0_list[tb]                                                                            
-    print IndexInit
-    i1 = IndexInit[0]
-    i2 = IndexInit[1]
-    i3 = IndexInit[2]
-    symb1 = symb1_list[i1] 
-    symb2 = symb2_list[i2]
-    symb3 = symb3_list[i3]
-    Initial = array([0.75*K_C, 0.0000005, 0.0000005, 0.0000005, symb1*Ksmax*0.75*K_C, symb2*Ksmax*0.75*K_C, symb3*0.75*Ksmax*K_C])
-    Time = arange(0, t0+tmax+step, step)
-    
-    ShiftDomTiming1 = zeros(len(S0_list)) 
-    ShiftDomTiming2 = zeros(len(S0_list))
-    RecovTiming1 = zeros(len(S0_list))
-    RecovTiming2 = zeros(len(S0_list))
-    for iS0 in xrange(len(S0_list)):
-        S00_i = S0_list[iS0]
-        tk = Tk[0]
-        tl = Tl[0]
-        print Tbar0, iS0, len(S0_list)
-        Temperature = Forcing2(0, t0, t1, tk, tl, Tbar0, A_B[iAB])
-        for case in xrange(2):
-            if case == 0:
-                ode15s = ode(SystemForcing1)
-                ode15s.set_f_params(Temperature, beta, gammaH, sigma1, sigma2, sigma3, S00_i, N, cmax)
-            else:
-                ode15s = ode(SystemForcing2)
-                ode15s.set_f_params(Temperature, beta, gammaH, sigma1, sigma2, sigma3, S00_i, N, cmax, rho)
-
-            # Introducing temperature dependence, environmental temperature forcing
-            ode15s.set_integrator('vode', method='bdf', order=15, nsteps=3000)
-            ode15s.set_initial_value(Initial, 0)
-            Dynamics = zeros((len(Time), len(Initial)))
-            Dynamics[0, 0] = ode15s.y[0]
-            Dynamics[0, 1] = ode15s.y[1]
-            Dynamics[0, 2] = ode15s.y[2]
-            Dynamics[0, 3] = ode15s.y[3]
-            Dynamics[0, 4] = ode15s.y[4]
-            Dynamics[0, 5] = ode15s.y[5]
-            Dynamics[0, 6] = ode15s.y[6]
-        
-            k=1
-            while ode15s.successful() and k<len(Time):#ode15s.t <= max(Time)-step+1:
-                #print len(Time), k, max(Time) - step
-                ode15s.integrate(ode15s.t+step)
-                Dynamics[k, 0] = ode15s.y[0]
-                Dynamics[k, 1] = ode15s.y[1]
-                Dynamics[k, 2] = ode15s.y[2]
-                Dynamics[k, 3] = ode15s.y[3]
-                Dynamics[k, 4] = ode15s.y[4]
-                Dynamics[k, 5] = ode15s.y[5]
-                Dynamics[k, 6] = ode15s.y[6]
-                # Updating environmental temperature forcing
-                Temperature = Forcing2(ode15s.t+step, t0, t1, tk, tl, Tbar0, A_B[iAB])
-                if case == 0:
-                    ode15s.set_f_params(Temperature, beta, gammaH, sigma1, sigma2, sigma3, S00_i, N, cmax)
-                if case == 1:
-                    ode15s.set_f_params(Temperature, beta, gammaH, sigma1, sigma2, sigma3, S00_i, N, cmax, rho)
-                k+=1
-            
-            #traj 
-            
-            if tb == 0 and iS0 <= 10:
-                if case == 0:
-                    sub0 = fig2.add_subplot(221)
-                    sub0.set_title("%d"%Tbar0+u"\N{DEGREE SIGN}C", fontsize = fsizeT, fontproperties = font)
-                    sub0.plot(Time, (Dynamics[:,6]/Dynamics[:,0])/1e6, linewidth = lw_case1, color = "#fbceb1")
-                    sub0.plot(Time, (Dynamics[:,5]/Dynamics[:,0])/1e6,linewidth = lw_case1, color = "#d99058")
-                    sub0.plot(Time, (Dynamics[:,4]/Dynamics[:,0])/1e6,linewidth = lw_case1, color = "#964b00")
-                if case == 1:
-                    sub0 = fig2. add_subplot(223)
-                    sub0.plot(Time, (Dynamics[:,6]/Dynamics[:,0])/1e6, linewidth = lw_case2, color = "#fbceb1")
-                    sub0.plot(Time, (Dynamics[:,5]/Dynamics[:,0])/1e6,linewidth = lw_case2, color = "#d99058")
-                    sub0.plot(Time, (Dynamics[:,4]/Dynamics[:,0])/1e6,linewidth = lw_case2, color = "#964b00")
-            if tb == 1 and iS0 <= 10:
-                if case == 0:
-                    sub0 = fig2.add_subplot(222)
-                    sub0.set_title("%d"%Tbar0+u"\N{DEGREE SIGN}C", fontsize = fsizeT, fontproperties = font)
-                    sub0.plot(Time, (Dynamics[:,6]/Dynamics[:,0])/1e6, linewidth = lw_case1, color = "#fbceb1")
-                    sub0.plot(Time, (Dynamics[:,5]/Dynamics[:,0])/1e6,linewidth = lw_case1, color = "#d99058")
-                    sub0.plot(Time, (Dynamics[:,4]/Dynamics[:,0])/1e6,linewidth = lw_case1, color = "#964b00")
-                if case == 1:
-                    sub0 = fig2. add_subplot(224)
-                    sub0.plot(Time, (Dynamics[:,6]/Dynamics[:,0])/1e6, linewidth = lw_case2, color = "#fbceb1")
-                    sub0.plot(Time, (Dynamics[:,5]/Dynamics[:,0])/1e6,linewidth = lw_case2, color = "#d99058")
-                    sub0.plot(Time, (Dynamics[:,4]/Dynamics[:,0])/1e6,linewidth = lw_case2, color = "#964b00")
-            
-            # Find the time when the density of more adapted symbiont becomes lower than the density of the other symbiont
-            # knowing that this occurs for this particula temperature forcing and parameters
-            if Tbar0 == 26:
-                # testing for occurence of shuffling, it happens if one of the test is true, therefore a +
-                Test = (Dynamics[:, 6] < Dynamics[:, 5])+(Dynamics[:, 6] < Dynamics[:, 4])
-            elif Tbar0 == 27:
-                Test = (Dynamics[:, 5] < Dynamics[:, 4])+(Dynamics[:, 5] < Dynamics[:, 6])
-                
-            if case == 0:
-                if len(Time[Test]) !=0:
-                    ShiftDomTiming1[iS0] = Time[Test][0] # take the first time the test is true
-                    # testing for recovery after temperature returen to baseline, it happens only if all tests are true, therefore *
-                    if Tbar0 == 26:
-                        Test1 = (Dynamics[Time>=t1, 6] > Dynamics[Time>=t1, 5])*(Dynamics[Time>=t1, 6] > Dynamics[Time>=t1, 4])
-                        if sum(Test1)!=0:
-                            RecovTiming1[iS0] = Time[Time>=t1][Test1][0]
-                        else:
-                            RecovTiming1[iS0] = 1e6 # some impossible number
-                    elif Tbar0 == 27:
-                        Test1 = (Dynamics[Time>=t1, 5] > Dynamics[Time>=t1, 4])*(Dynamics[Time>=t1, 5] > Dynamics[Time>=t1, 6])
-                        if sum(Test1)!=0:
-                            RecovTiming1[iS0] = Time[Time>=t1][Test1][0]
-                        else:
-                            RecovTiming1[iS0] = 1e6 # some impossible number
-                else:
-                    ShiftDomTiming1[iS0] = 1e6 # some impossible number 
-                    RecovTiming1[iS0] = 1e6
-            else:
-                if len(Time[Test]) !=0:
-                    ShiftDomTiming2[iS0] = Time[Test][0] # take the first time the test is true    
-                    # Testing for recovery , it happens only if all tests are true, therefore *
-                    if Tbar0 == 26:
-                        Test1 = (Dynamics[Time>=t1, 6] > Dynamics[Time>=t1, 5])*(Dynamics[Time>=t1, 6] > Dynamics[Time>=t1, 4])
-                        if sum(Test1)!=0:
-                            RecovTiming2[iS0] = Time[Time>=t1][Test1][0]
-                        else:
-                            RecovTiming2[iS0] = 1e6 # some impossible number
-                    elif Tbar0 == 27:
-                        Test1 = (Dynamics[Time>=t1, 5] > Dynamics[Time>=t1, 4])*(Dynamics[Time>=t1, 5] > Dynamics[Time>=t1, 6])
-                        if sum(Test1)!=0:
-                            RecovTiming2[iS0] = Time[Time>=t1][Test1][0]
-                        else:
-                            RecovTiming2[iS0] = 1e6 # some impossible number
-                else:
-                    ShiftDomTiming2[iS0] = 1e6  # some impossible number 
-                    RecovTiming2[iS0] = 1e6                        
-    ShiftList1.append(ShiftDomTiming1)
-    ShiftList2.append(ShiftDomTiming2)
-    RecovList1.append(RecovTiming1)
-    RecovList2.append(RecovTiming2)
-
-# saving files
-fileShift1 = open("TimingData/Shift_H1.dat", "wr")
-fileShift2 = open("TimingData/Shift_H2.dat", "wr")
-fileRecov1 = open("TimingData/Recov_H1.dat", "wr")
-fileRecov2 = open("TimingData/Recov_H2.dat", "wr")
-
-array(ShiftList1).dump(fileShift1)
-fileShift1.flush()
-array(ShiftList2).dump(fileShift2)
-fileShift2.flush()
-array(RecovList1).dump(fileRecov1)
-fileRecov1.flush()
-array(RecovList2).dump(fileRecov2)
-fileRecov2.flush()
-"""
-
-
-# Plotting saved file (# Sensitivity of timing of symbiont shuffling with respect to S_0, Using temperature forcing 2 displayed in the 1D figures)
-
-fig = plt.figure(figsize = (12, 9))
-#plt.subplots_adjust(bottom = 0.1, right = 0.85, left = 0.10, top = 0.95, wspace = 0.1, hspace = 0.1) # small screen  for poportion of carrying capacity on the x-axis
-plt.subplots_adjust(bottom = 0.1, right = 0.85, left = 0.10, top = 0.95, wspace = 0.15, hspace = 0.1) # small screen  for million cell/cm2 per month
-
-#plt.subplots_adjust(bottom = 0.25, right = 0.70, left = 0.10, top = 0.95, wspace = 0.1, hspace = 0.1) # large screen           
-
-fileShift1 = open("TimingData-tmax10yrs/Shift_H1.dat", "r")
-fileShift2 = open("TimingData-tmax10yrs/Shift_H2.dat", "r")
-fileRecov1 = open("TimingData-tmax10yrs/Recov_H1.dat", "r")
-fileRecov2 = open("TimingData-tmax10yrs/Recov_H2.dat", "r")
-
-ShiftDomTimingList1 = load(fileShift1)
-fileShift1.close()
-ShiftDomTimingList2 = load(fileShift2)
-fileShift2.close()
-RecovTimingList1 = load(fileRecov1)
-fileRecov1.close()
-RecovTimingList2 = load(fileRecov2)
-fileRecov2.close()
-count = 1
-Marksiz = 50
-
-maxprop = 1 # could go up to 2
-maxMonth1 = 15 # maximum month to observe shuffling
-maxMonth2 = 40 # maximum month to observe recovery
-for tb in xrange(len(Tbar0_list)): 
-    DL = dl_list[tb]  
-    iAB = iAB_list[tb]                              
-    t1 = t0 + dur_list[DL]
-    IndexInit = IndexInit_list[tb]  
-    Tbar0 = Tbar0_list[tb]                                                                            
-    print IndexInit
-    i1 = IndexInit[0]
-    i2 = IndexInit[1]
-    i3 = IndexInit[2]
-    symb1 = symb1_list[i1] 
-    symb2 = symb2_list[i2]
-    symb3 = symb3_list[i3]
-    Initial = array([0.75*K_C, 0.0000005, 0.0000005, 0.0000005, symb1*Ksmax*0.75*K_C, symb2*Ksmax*0.75*K_C, symb3*0.75*Ksmax*K_C])
-    Time = arange(0, t0+tmax+step, step)
-    
-    ShiftDomTiming1 = ShiftDomTimingList1[tb]
-    ShiftDomTiming2 = ShiftDomTimingList2[tb]
-    RecovTiming1 = RecovTimingList1[tb]
-    RecovTiming2 = RecovTimingList2[tb]
-                  
-    sub1 = fig.add_subplot(2, 2, count)
-    sub2 = fig.add_subplot(2, 2, count+2)
-    
-    notIgnore1a = ShiftDomTiming1 != 1e6
-    notIgnore2a = ShiftDomTiming2 != 1e6   
-
-    notIgnore1b = (RecovTiming1!=1e6)
-    notIgnore2b = (RecovTiming2!=1e6) 
-    
-       
-    # plot lines     
-    #sub1.plot(S0_list[notIgnore1a], ShiftDomTiming1[notIgnore1a]-t0, color = "grey", linewidth = lw_case1)
-    #sub1.plot(S0_list[notIgnore2a], ShiftDomTiming2[notIgnore2a]-t0, color = "grey", linewidth = lw_case2)
-    
-    #sub2.plot(S0_list[notIgnore1b], RecovTiming1[notIgnore1b]-t1, color = "grey", linewidth = lw_case1)
-    #sub2.plot(S0_list[notIgnore2b], RecovTiming2[notIgnore2b]-t1, color = "grey", linewidth = lw_case2)
-    
-    # plot points
-    #sub1.plot(S0_list[notIgnore1a], ShiftDomTiming1[notIgnore1a]-t0, "o", color = "grey", markersize = 4)
-    #sub1.plot(S0_list[notIgnore2a], ShiftDomTiming2[notIgnore2a]-t0, "o", color = "grey", markersize = 10)
-        
-    #sub2.plot(S0_list[notIgnore1b], RecovTiming1[notIgnore1b]-t1, "o",color = "grey", markersize = 4)
-    #sub2.plot(S0_list[notIgnore2b], RecovTiming2[notIgnore2b]-t1, "o", color = "grey", markersize = 10)
-    
-    # plot scatter points open filled circle for H1, circle for H2
-    sub1.scatter(S0_list[notIgnore1a], ShiftDomTiming1[notIgnore1a]-t0, s = Marksiz, color = "black")
-    sub1.scatter(S0_list[notIgnore2a], ShiftDomTiming2[notIgnore2a]-t0, s = Marksiz, color= "grey")
-        
-    sub2.scatter(S0_list[notIgnore1b], RecovTiming1[notIgnore1b]-t1, s = Marksiz, color = "black")
-    sub2.scatter(S0_list[notIgnore2b], RecovTiming2[notIgnore2b]-t1, s = Marksiz, color= "grey")
-
-        
-    sub1.tick_params(labelbottom = False, labeltop = False, bottom = True, top = True, axis = "x", direction = "in", pad = 10, labelsize = fsize)
-    sub2.tick_params(labelbottom = True, labeltop = False, bottom = True, top = True, axis = "x", direction = "in", pad = 10, labelsize = fsize)
-    
-    if count == 1:
-        sub1.tick_params(labelleft = True, labelright = False, left = True, right = True, bottom = True, top = True, axis = "y", direction = "in", pad = 5, labelsize = fsize)
-        sub2.tick_params(labelleft = True, labelright = False, left = True, right = True, bottom = True, top = True, axis = "y", direction = "in", pad = 5, labelsize = fsize)
-
-    if count == 2:
-        sub1.tick_params(labelleft = False, labelright = False, left = True, right = True, bottom = True, top = True, axis = "y", direction = "in", pad = 5, labelsize = fsize)
-        sub2.tick_params(labelleft = False, labelright = False, left = True, right = True, bottom = True, top = True, axis = "y", direction = "in", pad = 5, labelsize = fsize)
- 
-    #sub1.set_xticks(arange(min(S0_list), max(S0_list)+0.1, 0.1))
-    #sub1.set_xticklabels(["%.1f"%s0 for s0 in arange(min(S0_list), max(S0_list)+0.1, 0.1)]) 
-    sub1.set_xticks(arange(0, maxprop+0.1, 0.1))
-    #sub1.set_xticklabels(["%.1f"%(s0*Ksmax/(1e6) for s0 in arange(0, maxprop+0.1, 0.1)]) 
-    sub2.set_xticks(arange(0, maxprop+0.1, 0.1))
-    sub2.set_xticklabels(["%.1f"%(s0*Ksmax/(1e6)) for s0 in arange(0, maxprop+0.1, 0.1)]) # converting s0 to million cells/cm2 per year to for consitency with manuscript text
-    
-    maxTa = max(max(ShiftDomTiming1[notIgnore1a])-t0, max(ShiftDomTiming2[notIgnore2a])-t0)
-    minTa = min(min(ShiftDomTiming1[notIgnore1a])-t0, min(ShiftDomTiming2[notIgnore2a])-t0)
-    
-    if sum(notIgnore1b)!=0 and sum(notIgnore2b)!=0:
-        maxTb = max(max(RecovTiming1[notIgnore1b])-t1, max(RecovTiming2[notIgnore2b])-t1)
-        minTb = min(min(RecovTiming1[notIgnore1b])-t1, min(RecovTiming2[notIgnore2b])-t1)
-    elif sum(notIgnore1b)!=0:
-        maxTb = max(RecovTiming1[notIgnore1b])-t1
-        mintTb =min(RecovTiming1[notIgnore1b])-t1
-    elif sum(notIgnore2b)!=0:
-        maxTb = max(RecovTiming2[notIgnore2b])-t1
-        mintTb =min(RecovTiming2[notIgnore2b])-t1
-        
-    sub1.set_ylim((0, maxMonth1/12))#((minTa-0.1, maxTa+0.1))
-    sub1.set_xlim((0, maxprop))#((min(S0_list), max(S0_list)))
-    
-    sub2.set_ylim((0, maxMonth2/12))#((minTb-0.1, maxTb+0.1))
-    sub2.set_xlim((0, maxprop))#((min(S0_list), max(S0_list)))
-    
-    #sub1.plot(S00*ones(5), linspace(minTa-0.1, maxTa+0.1, 5), color = "green", linewidth = 2) # indicating the value used in main results
-    #sub2.plot(S00*ones(5), linspace(minTb-0.1, maxTb+0.1, 5), color = "green", linewidth = 2) # indicating the value used in main results
-    
-    sub1.plot(S00*ones(5), linspace(0, maxMonth1/12, 5),"--", color = "black", linewidth = 3) # indicating the value used in main results
-    sub2.plot(S00*ones(5), linspace(0, maxMonth2/12, 5),"--", color = "black", linewidth = 3) # indicating the value used in main results
-  
-    
-    sub1.set_yticks(arange(0, maxMonth1/12 + 1/12, 1/12))#(linspace(minTa-0.1, maxTa+0.1, 10))
-    sub1.set_yticklabels(["%d"%temp for temp in arange(0, maxMonth1 + 1, 1)])
-    
-    sub2.set_yticks(arange(0, maxMonth2/12 + 1/12, 5/12))#(linspace(minTb-0.1, maxTb+0.1, 10))
-    sub2.set_yticklabels(["%d"%temp for temp in arange(0, maxMonth2 + 1, 5)])
-    if count == 1:
-        #sub1.set_ylabel("Shift of symbiont dominance\nfrom the start of thermal shift\n(months) ", fontsize = fsizeT, labelpad = 8) #labelpad= 9)
-        sub1.set_ylabel("Symbiont shuffling from\nonset of temperature shift\n(month) ", fontsize = fsizeT, labelpad = 8)
-        #sub2.set_ylabel("Recovery of initial symbiont\nfrom the end of thermal shift\n(months) ", fontsize = fsizeT, labelpad = 1) #labelpad= 9)
-        sub2.set_ylabel("Symbiont recovery from\nend of temperature shift\n(month) ", fontsize = fsizeT, labelpad = 1) #labe
-    if count == 2:
-        #sub2.text(S0_list[0]-0.5, minTb - 1.2, "Rate of symbiont sustainance $S_0$ (year$^{-1}$)", fontsize = fsizeT)
-        #sub2.text(0, 0 - 42/12, "Non-density dependent growth ($S_0$)\nallocated to collapsing symbiont population\n(proportion of carrying capacity per year)", horizontalalignment = "center", fontsize = fsizeT)
-        #sub2.text(0, 0 - 40/12, "Non-density dependent growth ($S_0$)\nallocated to collapsing symbiont population\n(proportion of carrying capacity per year)", horizontalalignment = "center", fontsize = fsizeT)
-        #sub2.text(0, 0 - 19/12, "Non-density dependent growth ($S_0$)\nallocated to collapsing symbiont population\n(million cells cm$^{-2}$ month$^{-1}$)", horizontalalignment = "center", fontsize = fsizeT)
-        sub2.text(0, 0-8/12, "$S_0$ (x 10$^{6}$ cells cm$^{-2}$ year$^{-1}$)", horizontalalignment = "center", fontsize = fsizeT)
-    sub1.set_title("%d"%Tbar0+u"\N{DEGREE SIGN}C", fontsize = fsizeT, fontproperties = font)
-
-    if count == 1:
-        #sub1.text(S0_list[0]-0.20, maxTa+0.1, Lab1[tb], fontproperties = font, fontsize = fsize)
-        #sub2.text(S0_list[0]-0.20, maxTb+0.1, Lab2[tb], fontproperties = font, fontsize = fsize)
-        sub1.text(S0_list[0]-0.155, maxMonth1/12, Lab1[tb], fontproperties = font, fontsize = fsize)
-        sub2.text(S0_list[0]-0.155, maxMonth2/12, Lab2[tb], fontproperties = font, fontsize = fsize)
-    else:
-        #sub1.text(S0_list[0]-0.05, maxTa+0.1, Lab1[tb], fontproperties = font, fontsize = fsize)
-        #sub2.text(S0_list[0]-0.05, maxTb+0.1, Lab2[tb], fontproperties = font, fontsize = fsize)
-        sub1.text(S0_list[0]-0.05, maxMonth1/12, Lab1[tb], fontproperties = font, fontsize = fsize)
-        sub2.text(S0_list[0]-0.05, maxMonth2/12, Lab2[tb], fontproperties = font, fontsize = fsize)
-    count += 1 
-    
-    if tb == 0:
-        sub1.annotate(s='', xy=(1,0.65), xytext=(0.25,0.65), arrowprops=dict(arrowstyle='<->'))
-        sub2.annotate(s='', xy=(1,1.4), xytext=(0.225,1.4), arrowprops=dict(arrowstyle='<->'))
-        
-        sub1.annotate(s='', xy=(1,0.7), xytext=(0.07,0.7), arrowprops=dict(arrowstyle='<->', color = "grey"))
-        sub2.annotate(s='', xy=(0.06,1.4), xytext=(0.15,1.4), arrowprops=dict(arrowstyle='<->', color = "grey"))
-    
-    else:
-        sub1.annotate(s='', xy=(1,0.2), xytext=(0.2,0.2), arrowprops=dict(arrowstyle='<->'))
-        sub2.annotate(s='', xy=(0.15,1.7), xytext=(0.25,1.7), arrowprops=dict(arrowstyle='<->'))
-        sub2.annotate(s='', xy=(1,1.7), xytext=(0.725,1.7), arrowprops=dict(arrowstyle='<->'))
-
-        sub1.annotate(s='', xy=(1,0.1), xytext=(0.07,0.1), arrowprops=dict(arrowstyle='<->', color = "grey"))
-
-
-    
-#Separately
-#plt.subplots_adjust(bottom = 0.5, right = 0.80, left = 0.10, top = 0.90, wspace = 0.1, hspace = 0.15) # big screen            
-#plt.subplots_adjust(bottom = 0.5, right = 0.60, left = 0.10, top = 0.90, wspace = 0.1, hspace = 0.15) # small screen           
-
-#Together
-#plt.subplots_adjust(bottom = 0.1, right = 0.60, left = 0.10, top = 0.95, wspace = 0.1, hspace = 0.15)            
-
-
-
-plt.savefig("TemporaryFig.pdf", bbox_inches = 'tight')
-       
-plt.show()
 
 
 
