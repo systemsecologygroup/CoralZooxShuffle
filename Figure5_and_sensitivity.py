@@ -9,6 +9,7 @@ from matplotlib import pyplot as plt
 import matplotlib
 from matplotlib.font_manager import FontProperties
 from matplotlib.patches import Polygon
+import pdb
 
 font = {'family' : 'normal',
         'weight' : 'bold'}
@@ -568,7 +569,7 @@ fileRecov2.flush()
 """ Figure 5 """
 # Plotting saved file (# Sensitivity of timing of symbiont shuffling with respect to S_0, Using temperature forcing 2 displayed in the 1D figures)
 
-fig = plt.figure(figsize = (17, 9))
+fig = plt.figure(figsize = (18, 9))
 #plt.subplots_adjust(bottom = 0.1, right = 0.85, left = 0.10, top = 0.95, wspace = 0.1, hspace = 0.1) # small screen  for poportion of carrying capacity on the x-axis
 #plt.subplots_adjust(bottom = 0.1, right = 0.85, left = 0.10, top = 0.95, wspace = 0.15, hspace = 0.1) # small screen  for million cell/cm2 per month
 
@@ -636,7 +637,6 @@ for tb in xrange(len(Tbar0_list)):
     sub2.scatter(S0_list[notIgnore1b], RecovTiming1[notIgnore1b]-t1, s = Marksiz, color = h1col)
     sub2.scatter(S0_list[notIgnore2b], RecovTiming2[notIgnore2b]-t1, s = Marksiz, color= h2col)
 
-        
     sub1.tick_params(labelbottom = False, labeltop = False, bottom = True, top = True, axis = "x", direction = "in", pad = 10, labelsize = fsize)
     sub2.tick_params(labelbottom = True, labeltop = False, bottom = True, top = True, axis = "x", direction = "in", pad = 10, labelsize = fsize)
     
@@ -648,12 +648,11 @@ for tb in xrange(len(Tbar0_list)):
         sub1.tick_params(labelleft = False, labelright = False, left = True, right = True, bottom = True, top = True, axis = "y", direction = "in", pad = 5, labelsize = fsize)
         sub2.tick_params(labelleft = False, labelright = False, left = True, right = True, bottom = True, top = True, axis = "y", direction = "in", pad = 5, labelsize = fsize)
  
-    #sub1.set_xticks(arange(min(S0_list), max(S0_list)+0.1, 0.1))
-    #sub1.set_xticklabels(["%.1f"%s0 for s0 in arange(min(S0_list), max(S0_list)+0.1, 0.1)]) 
-    sub1.set_xticks(arange(0, maxprop+0.1, 0.1)[::2])
-    #sub1.set_xticklabels(["%.1f"%(s0*Ksmax/(1e6) for s0 in arange(0, maxprop+0.1, 0.1)]) 
-    sub2.set_xticks(arange(0, maxprop+0.1, 0.1)[::2])
-    sub2.set_xticklabels(["%.1f"%(s0*Ksmax/(1e6)) for s0 in arange(0, maxprop+0.1, 0.1)]) # converting s0 to million cells/cm2 per year to for consitency with manuscript text
+    per = 2
+    xTicks = arange(0, maxprop+0.1, 0.1)[::per]
+    sub1.set_xticks(xTicks)
+    sub2.set_xticks(xTicks)
+    sub2.set_xticklabels(["%.1f"%(s0*Ksmax/(1e6)) for s0 in xTicks]) # converting s0 to million cells/cm2 per year to for consitency with manuscript text
     
     maxTa = max(max(ShiftDomTiming1[notIgnore1a])-t0, max(ShiftDomTiming2[notIgnore2a])-t0)
     minTa = min(min(ShiftDomTiming1[notIgnore1a])-t0, min(ShiftDomTiming2[notIgnore2a])-t0)
@@ -669,16 +668,14 @@ for tb in xrange(len(Tbar0_list)):
         mintTb =min(RecovTiming2[notIgnore2b])-t1
         
     sub1.set_ylim((0, maxMonth1/12))#((minTa-0.1, maxTa+0.1))
-    sub1.set_xlim((0, maxprop))#((min(S0_list), max(S0_list)))
+    sub1.set_xlim((0, 1))
     
     sub2.set_ylim((0, maxMonth2/12))#((minTb-0.1, maxTb+0.1))
-    sub2.set_xlim((0, maxprop))#((min(S0_list), max(S0_list)))
+    sub2.set_xlim((0, 1))
     
-    #sub1.plot(S00*ones(5), linspace(minTa-0.1, maxTa+0.1, 5), color = "green", linewidth = 2) # indicating the value used in main results
-    #sub2.plot(S00*ones(5), linspace(minTb-0.1, maxTb+0.1, 5), color = "green", linewidth = 2) # indicating the value used in main results
-    
-    sub1.plot(S00*ones(5), linspace(0, maxMonth1/12, 5),"--", color = "black", linewidth = 2) # indicating the value used in main results
-    sub2.plot(S00*ones(5), linspace(0, maxMonth2/12, 5),"--", color = "black", linewidth = 2, label = "$S_0$ for Fig 3-4") # indicating the value used in main results
+    mainVal = S00 # only the proportion because the xticklabels are the ones coverting into the unit necessary
+    sub1.plot(mainVal*ones(5), linspace(0, maxMonth1/12, 5),"--", color = "black", linewidth = 2) # indicating the value used in main results
+    sub2.plot(mainVal*ones(5), linspace(0, maxMonth2/12, 5),"--", color = "black", linewidth = 2, label = "$S_0$ for Fig 3-4") # indicating the value used in main results
     
     if tb == 0:
         sub2.legend(fontsize = fsize - 2)
